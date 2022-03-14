@@ -200,16 +200,18 @@ func (c *Client) AuthorizeOrder(ctx context.Context, id []AuthzID, opt ...OrderO
 // If a caller needs to poll an order until its status is final,
 // see the WaitOrder method.
 func (c *Client) GetOrder(ctx context.Context, url string) (*Order, error) {
-	if _, err := c.Discover(ctx); err != nil {
-		return nil, err
-	}
+	e := errors.New("GET ORDER ERROR")
+	return nil, e
+	// if _, err := c.Discover(ctx); err != nil {
+	// 	return nil, err
+	// }
 
-	res, err := c.postAsGet(ctx, url, wantStatus(http.StatusOK))
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	return responseOrder(res)
+	// res, err := c.postAsGet(ctx, url, wantStatus(http.StatusOK))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer res.Body.Close()
+	// return responseOrder(res)
 }
 
 // WaitOrder polls an order from the given URL until it is in one of the final states,
