@@ -69,11 +69,13 @@ var preferredKexAlgos = []string{
 // supportedHostKeyAlgos specifies the supported host-key algorithms (i.e. methods
 // of authenticating servers) in preference order.
 var supportedHostKeyAlgos = []string{
-	CertAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01,
+	CertSigAlgoRSASHA2512v01, CertSigAlgoRSASHA2256v01,
+	CertSigAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01,
 	CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoED25519v01,
 
 	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
-	KeyAlgoRSA, KeyAlgoDSA,
+	SigAlgoRSASHA2512, SigAlgoRSASHA2256,
+	SigAlgoRSA, KeyAlgoDSA,
 
 	KeyAlgoED25519,
 }
@@ -90,16 +92,20 @@ var supportedCompressions = []string{compressionNone}
 // hashFuncs keeps the mapping of supported algorithms to their respective
 // hashes needed for signature verification.
 var hashFuncs = map[string]crypto.Hash{
-	KeyAlgoRSA:          crypto.SHA1,
-	KeyAlgoDSA:          crypto.SHA1,
-	KeyAlgoECDSA256:     crypto.SHA256,
-	KeyAlgoECDSA384:     crypto.SHA384,
-	KeyAlgoECDSA521:     crypto.SHA512,
-	CertAlgoRSAv01:      crypto.SHA1,
-	CertAlgoDSAv01:      crypto.SHA1,
-	CertAlgoECDSA256v01: crypto.SHA256,
-	CertAlgoECDSA384v01: crypto.SHA384,
-	CertAlgoECDSA521v01: crypto.SHA512,
+	SigAlgoRSA:               crypto.SHA1,
+	SigAlgoRSASHA2256:        crypto.SHA256,
+	SigAlgoRSASHA2512:        crypto.SHA512,
+	KeyAlgoDSA:               crypto.SHA1,
+	KeyAlgoECDSA256:          crypto.SHA256,
+	KeyAlgoECDSA384:          crypto.SHA384,
+	KeyAlgoECDSA521:          crypto.SHA512,
+	CertSigAlgoRSAv01:        crypto.SHA1,
+	CertSigAlgoRSASHA2256v01: crypto.SHA256,
+	CertSigAlgoRSASHA2512v01: crypto.SHA512,
+	CertAlgoDSAv01:           crypto.SHA1,
+	CertAlgoECDSA256v01:      crypto.SHA256,
+	CertAlgoECDSA384v01:      crypto.SHA384,
+	CertAlgoECDSA521v01:      crypto.SHA512,
 }
 
 // unexpectedMessageError results when the SSH message that we received didn't
@@ -146,6 +152,11 @@ func (a *directionAlgorithms) rekeyBytes() int64 {
 	return 1 << 30
 }
 
+var aeadCiphers = map[string]bool{
+	gcmCipherID:        true,
+	chacha20Poly1305ID: true,
+}
+
 type algorithms struct {
 	kex     string
 	hostKey string
@@ -181,14 +192,18 @@ func findAgreedAlgorithms(isClient bool, clientKexInit, serverKexInit *kexInitMs
 		return
 	}
 
-	ctos.MAC, err = findCommon("client to server MAC", clientKexInit.MACsClientServer, serverKexInit.MACsClientServer)
-	if err != nil {
-		return
+	if !aeadCiphers[ctos.Cipher] {
+		ctos.MAC, err = findCommon("client to server MAC", clientKexInit.MACsClientServer, serverKexInit.MACsClientServer)
+		if err != nil {
+			return
+		}
 	}
 
-	stoc.MAC, err = findCommon("server to client MAC", clientKexInit.MACsServerClient, serverKexInit.MACsServerClient)
-	if err != nil {
-		return
+	if !aeadCiphers[stoc.Cipher] {
+		stoc.MAC, err = findCommon("server to client MAC", clientKexInit.MACsServerClient, serverKexInit.MACsServerClient)
+		if err != nil {
+			return
+		}
 	}
 
 	ctos.Compression, err = findCommon("client to server compression", clientKexInit.CompressionClientServer, serverKexInit.CompressionClientServer)

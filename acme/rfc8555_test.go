@@ -62,7 +62,7 @@ func TestRFC_Discover(t *testing.T) {
 		}`, nonce, reg, order, authz, revoke, keychange, metaTerms, metaWebsite, metaCAA)
 	}))
 	defer ts.Close()
-	c := Client{DirectoryURL: ts.URL}
+	c := &Client{DirectoryURL: ts.URL}
 	dir, err := c.Discover(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -344,7 +344,7 @@ func TestRFC_Register(t *testing.T) {
 	if !didPrompt {
 		t.Error("tos prompt wasn't called")
 	}
-	if v := cl.accountKID(ctx); v != keyID(okAccount.URI) {
+	if v := cl.accountKID(ctx); v != KeyID(okAccount.URI) {
 		t.Errorf("account kid = %q; want %q", v, okAccount.URI)
 	}
 }
@@ -482,7 +482,7 @@ func TestRFC_RegisterExternalAccountBinding(t *testing.T) {
 	if !didPrompt {
 		t.Error("tos prompt wasn't called")
 	}
-	if v := cl.accountKID(ctx); v != keyID(okAccount.URI) {
+	if v := cl.accountKID(ctx); v != KeyID(okAccount.URI) {
 		t.Errorf("account kid = %q; want %q", v, okAccount.URI)
 	}
 }
@@ -502,7 +502,7 @@ func TestRFC_RegisterExisting(t *testing.T) {
 	if err != ErrAccountAlreadyExists {
 		t.Errorf("err = %v; want %v", err, ErrAccountAlreadyExists)
 	}
-	kid := keyID(s.url("/accounts/1"))
+	kid := KeyID(s.url("/accounts/1"))
 	if v := cl.accountKID(context.Background()); v != kid {
 		t.Errorf("account kid = %q; want %q", v, kid)
 	}
@@ -880,5 +880,37 @@ func TestRFC_AlreadyRevokedCert(t *testing.T) {
 	err := cl.RevokeCert(context.Background(), testKeyEC, []byte{0}, CRLReasonUnspecified)
 	if err != nil {
 		t.Fatalf("RevokeCert: %v", err)
+	}
+}
+
+func TestRFC_ListCertAlternates(t *testing.T) {
+	s := newACMEServer()
+	s.handle("/crt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pem-certificate-chain")
+		w.Header().Add("Link", `<https://example.com/crt/2>;rel="alternate"`)
+		w.Header().Add("Link", `<https://example.com/crt/3>; rel="alternate"`)
+		w.Header().Add("Link", `<https://example.com/acme>; rel="index"`)
+	})
+	s.handle("/crt2", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/pem-certificate-chain")
+	})
+	s.start()
+	defer s.close()
+
+	cl := &Client{Key: testKeyEC, DirectoryURL: s.url("/")}
+	crts, err := cl.ListCertAlternates(context.Background(), s.url("/crt"))
+	if err != nil {
+		t.Fatalf("ListCertAlternates: %v", err)
+	}
+	want := []string{"https://example.com/crt/2", "https://example.com/crt/3"}
+	if !reflect.DeepEqual(crts, want) {
+		t.Errorf("ListCertAlternates(/crt): %v; want %v", crts, want)
+	}
+	crts, err = cl.ListCertAlternates(context.Background(), s.url("/crt2"))
+	if err != nil {
+		t.Fatalf("ListCertAlternates: %v", err)
+	}
+	if crts != nil {
+		t.Errorf("ListCertAlternates(/crt2): %v; want nil", crts)
 	}
 }
