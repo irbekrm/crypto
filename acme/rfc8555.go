@@ -302,39 +302,41 @@ func responseOrder(res *http.Response) (*Order, error) {
 // CreateOrderCert returns an error if the CA's response is unreasonably large.
 // Callers are encouraged to parse the returned value to ensure the certificate is valid and has the expected features.
 func (c *Client) CreateOrderCert(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error) {
-	if _, err := c.Discover(ctx); err != nil { // required by c.accountKID
-		return nil, "", err
-	}
+	e := errors.New("SOME ERROR")
+	return nil, "", e
+	// if _, err := c.Discover(ctx); err != nil { // required by c.accountKID
+	// 	return nil, "", err
+	// }
 
-	// RFC describes this as "finalize order" request.
-	req := struct {
-		CSR string `json:"csr"`
-	}{
-		CSR: base64.RawURLEncoding.EncodeToString(csr),
-	}
-	res, err := c.post(ctx, nil, url, req, wantStatus(http.StatusOK))
-	if err != nil {
-		return nil, "", err
-	}
-	defer res.Body.Close()
-	o, err := responseOrder(res)
-	if err != nil {
-		return nil, "", err
-	}
+	// // RFC describes this as "finalize order" request.
+	// req := struct {
+	// 	CSR string `json:"csr"`
+	// }{
+	// 	CSR: base64.RawURLEncoding.EncodeToString(csr),
+	// }
+	// res, err := c.post(ctx, nil, url, req, wantStatus(http.StatusOK))
+	// if err != nil {
+	// 	return nil, "", err
+	// }
+	// defer res.Body.Close()
+	// o, err := responseOrder(res)
+	// if err != nil {
+	// 	return nil, "", err
+	// }
 
-	// Wait for CA to issue the cert if they haven't.
-	if o.Status != StatusValid {
-		o, err = c.WaitOrder(ctx, o.URI)
-	}
-	if err != nil {
-		return nil, "", err
-	}
-	// The only acceptable status post finalize and WaitOrder is "valid".
-	if o.Status != StatusValid {
-		return nil, "", &OrderError{OrderURL: o.URI, Status: o.Status}
-	}
-	crt, err := c.fetchCertRFC(ctx, o.CertURL, bundle)
-	return crt, o.CertURL, err
+	// // Wait for CA to issue the cert if they haven't.
+	// if o.Status != StatusValid {
+	// 	o, err = c.WaitOrder(ctx, o.URI)
+	// }
+	// if err != nil {
+	// 	return nil, "", err
+	// }
+	// // The only acceptable status post finalize and WaitOrder is "valid".
+	// if o.Status != StatusValid {
+	// 	return nil, "", &OrderError{OrderURL: o.URI, Status: o.Status}
+	// }
+	// crt, err := c.fetchCertRFC(ctx, o.CertURL, bundle)
+	// return crt, o.CertURL, err
 }
 
 // fetchCertRFC downloads issued certificate from the given URL.
